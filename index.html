@@ -93,5 +93,77 @@ document.querySelector('.card').appendChild(copyButton);
 
     window.addEventListener('load', start);
   </script>
+
+<!-- Apps Script 雙向通訊測試 -->
+<div style="text-align:center;padding:20px">
+  <h3>❤️ 戀愛點數銀行通訊測試</h3>
+
+  <p id="bridgeStatus">尚未開始測試</p>
+
+  <button type="button" onclick="testBridge()">
+    測試雙向通訊
+  </button>
+
+  <iframe
+    id="bankBridge"
+    title="Apps Script 通訊測試"
+    style="width:100%;height:100px;border:0">
+  </iframe>
+</div>
+
+<script>
+  const GAS_URL =
+    'https://script.google.com/macros/s/AKfycbx3Lx7duIrqO6Ml5ktrfjz8JKCxSsEAYplynyTU_NcSaHGa1E9HyoxzW7SXlfW0FNLWqg/exec';
+
+  let pendingNonce = null;
+
+  function testBridge() {
+    const status =
+      document.getElementById('bridgeStatus');
+
+    const frame =
+      document.getElementById('bankBridge');
+
+    pendingNonce = crypto.randomUUID();
+
+    status.textContent =
+      '正在載入 Apps Script……';
+
+    frame.onload = function() {
+      status.textContent =
+        'iframe 已載入，正在傳送 PING……';
+
+      frame.contentWindow.postMessage({
+        type: 'LOVE_BANK_PING',
+        nonce: pendingNonce
+      }, '*');
+    };
+
+    frame.src = GAS_URL;
+  }
+
+  window.addEventListener('message', function(event) {
+    const frame =
+      document.getElementById('bankBridge');
+
+    if (event.source !== frame.contentWindow) {
+      return;
+    }
+
+    const data = event.data;
+
+    if (
+      data &&
+      data.type === 'LOVE_BANK_PONG' &&
+      data.nonce === pendingNonce
+    ) {
+      document.getElementById('bridgeStatus')
+        .textContent = '❤️ 雙向通訊成功！';
+
+      pendingNonce = null;
+    }
+  });
+</script>
+
 </body>
 </html>
