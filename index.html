@@ -64,7 +64,23 @@
         }
 
         const profile = await liff.getProfile();
+const copyButton = document.createElement('button');
+copyButton.textContent = '複製我的 LINE User ID';
+copyButton.style.cssText =
+  'padding:12px 18px;margin-top:15px;' +
+  'background:#d77b9a;color:white;border:0;' +
+  'border-radius:12px;font-size:16px;cursor:pointer;';
 
+copyButton.onclick = async function () {
+  try {
+    await navigator.clipboard.writeText(profile.userId);
+    alert('LINE User ID 已複製！');
+  } catch (e) {
+    prompt('請複製以下 LINE User ID：', profile.userId);
+  }
+};
+
+document.querySelector('.card').appendChild(copyButton);
         status.textContent =
           '❤️ LINE 登入成功！\n你好，' +
           profile.displayName + '！';
