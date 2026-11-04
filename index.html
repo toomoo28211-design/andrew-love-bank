@@ -1,36 +1,37 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-  <title>Andrew Love Bank</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>彥安的戀愛點數銀行</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
     body {
-      background: #fff5f8;
-      color: #90435f;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff2f6;
       font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 60px 20px;
+      color: #914d67;
     }
-
     .card {
-      background: white;
-      padding: 30px 20px;
-      border-radius: 24px;
+      width: 85%;
       max-width: 400px;
-      margin: auto;
-      box-shadow: 0 4px 20px #b76b851c;
+      padding: 35px 20px;
+      background: white;
+      border-radius: 24px;
+      text-align: center;
+      box-shadow: 0 6px 24px #dca7b733;
     }
-
     h1 { font-size: 24px; }
-
     #status {
-      white-space: pre-wrap;
       line-height: 1.8;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -42,6 +43,7 @@
   </div>
 
   <script>
+    // 請改成你自己的 LIFF ID
     const LIFF_ID = '2012365860-t6qVKwpc';
 
     async function start() {
@@ -56,7 +58,7 @@
         });
 
         if (!liff.isLoggedIn()) {
-          status.textContent = '正在開啟 LINE 登入……';
+          status.textContent = '正在前往 LINE 登入……';
           liff.login();
           return;
         }
@@ -64,14 +66,12 @@
         const profile = await liff.getProfile();
 
         status.textContent =
-          '❤️ LINE 登入成功！\n' +
-          '你好，' + profile.displayName + '！\n' +
-          '下一步就可以串接戀愛點數銀行。';
+          '❤️ LINE 登入成功！\n你好，' +
+          profile.displayName + '！';
 
       } catch (error) {
         status.textContent =
-          '登入失敗：\n' +
-          (error.message || String(error));
+          'LINE 登入失敗：\n' + error.message;
       }
     }
 
