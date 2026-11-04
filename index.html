@@ -1,169 +1,157 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>彥安的戀愛點數銀行</title>
-
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4f6">
+  <title>彥安的戀愛點數銀行｜連線測試</title>
   <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff2f6;
-      font-family: Arial, sans-serif;
-      color: #914d67;
-    }
-    .card {
-      width: 85%;
-      max-width: 400px;
-      padding: 35px 20px;
-      background: white;
-      border-radius: 24px;
-      text-align: center;
-      box-shadow: 0 6px 24px #dca7b733;
-    }
-    h1 { font-size: 24px; }
-    #status {
-      line-height: 1.8;
-      white-space: pre-wrap;
-    }
+    :root { color-scheme: light; --pink:#c65b79; --dark:#4b3540; --muted:#776b72; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(155deg,#fff3f6,#fffaf7); font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif; color:var(--dark); min-height:100vh; }
+    main { width:min(100% - 32px,480px); margin:42px auto; }
+    .card { background:#fff; border-radius:22px; padding:24px; box-shadow:0 10px 35px #8b52601a; margin-bottom:18px; }
+    h1 { font-size:26px; margin:0 0 8px; text-align:center; }
+    h2 { font-size:18px; margin:0 0 12px; }
+    .subtitle { text-align:center; color:var(--muted); margin:0 0 22px; }
+    p { line-height:1.7; }
+    .status { background:#fff5f7; padding:12px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    button { border:0; border-radius:12px; background:var(--pink); color:white; padding:12px 18px; font-size:15px; font-weight:600; cursor:pointer; width:100%; margin:6px 0; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    button.secondary { background:#f4e7eb; color:var(--dark); }
+    small { color:var(--muted); display:block; line-height:1.6; }
+    iframe { display:block; width:100%; height:110px; border:1px solid #eee; border-radius:10px; margin-top:12px; background:white; }
+    code { overflow-wrap:anywhere; }
   </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
-
 <body>
-  <div class="card">
-    <h1>♡ 彥安的戀愛點數銀行</h1>
-    <p id="status">準備連接 LINE……</p>
-  </div>
-
+  <main>
+    <section class="card">
+      <h1>❤️ 彥安的戀愛點數銀行</h1>
+      <p class="subtitle">Andrew Love Bank · 安全連線測試版</p>
+      <h2>LINE 登入狀態</h2>
+      <p class="status" id="loginStatus">準備連線 LINE……</p>
+      <button class="secondary" id="copyIdButton" type="button" disabled>複製我的 LINE User ID</button>
+      <small>此測試頁不會新增、扣除或兌換點數。</small>
+    </section>
+    <section class="card">
+      <h2>Apps Script 雙向通訊</h2>
+      <p class="status" id="bridgeStatus">尚未開始測試</p>
+      <button id="testBridgeButton" type="button">測試雙向通訊</button>
+      <iframe id="bankBridge" title="Apps Script 通訊測試" referrerpolicy="no-referrer"></iframe>
+      <small>僅傳送 READY、PING、PONG 與隨機測試碼；不傳送 LINE 身分憑證。</small>
+    </section>
+  </main>
   <script>
-    // 請改成你自己的 LIFF ID
-    const LIFF_ID = '2012365860-t6qVKwpc';
+    'use strict';
 
-    async function start() {
-      const status = document.getElementById('status');
+    // 只修改這兩個設定值；不要在 GitHub 放入 Channel Secret 或 ID Token。
+    const LIFF_ID = '請貼上你的LIFF_ID';
+    const GAS_URL = '請貼上你的Apps_Script_exec網址';
 
+    const loginStatus = document.getElementById('loginStatus');
+    const copyIdButton = document.getElementById('copyIdButton');
+    const bridgeStatus = document.getElementById('bridgeStatus');
+    const testBridgeButton = document.getElementById('testBridgeButton');
+    const bankBridge = document.getElementById('bankBridge');
+
+    let myLineUserId = '';
+    let pendingNonce = null;
+    let bridgeWindow = null;
+    let bridgeOrigin = null;
+
+    async function initLine() {
+      if (!LIFF_ID || LIFF_ID.startsWith('請貼上')) {
+        loginStatus.textContent = '請先在 index.html 設定 LIFF_ID。';
+        return;
+      }
       try {
-        status.textContent = '正在初始化 LINE……';
-
-        await liff.init({
-          liffId: LIFF_ID,
-          withLoginOnExternalBrowser: true
-        });
-
+        await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
         if (!liff.isLoggedIn()) {
-          status.textContent = '正在前往 LINE 登入……';
-          liff.login();
+          loginStatus.textContent = '正在前往 LINE 登入……';
+          liff.login({ redirectUri: window.location.href });
           return;
         }
-
         const profile = await liff.getProfile();
-const copyButton = document.createElement('button');
-copyButton.textContent = '複製我的 LINE User ID';
-copyButton.style.cssText =
-  'padding:12px 18px;margin-top:15px;' +
-  'background:#d77b9a;color:white;border:0;' +
-  'border-radius:12px;font-size:16px;cursor:pointer;';
-
-copyButton.onclick = async function () {
-  try {
-    await navigator.clipboard.writeText(profile.userId);
-    alert('LINE User ID 已複製！');
-  } catch (e) {
-    prompt('請複製以下 LINE User ID：', profile.userId);
-  }
-};
-
-document.querySelector('.card').appendChild(copyButton);
-        status.textContent =
-          '❤️ LINE 登入成功！\n你好，' +
-          profile.displayName + '！';
-
+        myLineUserId = profile.userId || '';
+        loginStatus.textContent = '❤️ LINE 登入成功！你好，' + (profile.displayName || '親愛的') + '！';
+        copyIdButton.disabled = !myLineUserId;
       } catch (error) {
-        status.textContent =
-          'LINE 登入失敗：\n' + error.message;
+        loginStatus.textContent = 'LINE 登入失敗：' + (error.message || String(error));
       }
     }
 
-    window.addEventListener('load', start);
+    copyIdButton.addEventListener('click', async () => {
+      if (!myLineUserId) return;
+      try {
+        await navigator.clipboard.writeText(myLineUserId);
+        copyIdButton.textContent = '已複製 LINE User ID ✓';
+      } catch (error) {
+        loginStatus.textContent += '\n無法自動複製，請改用支援剪貼簿的瀏覽器。';
+      }
+    });
+
+    function isGoogleAppsScriptOrigin(origin) {
+      try {
+        const url = new URL(origin);
+        if (url.protocol !== 'https:') return false;
+        const host = url.hostname;
+        return host === 'script.google.com' ||
+          host === 'script.googleusercontent.com' ||
+          host.endsWith('.googleusercontent.com');
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function testBridge() {
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(GAS_URL)) {
+        bridgeStatus.textContent = '請先設定正確的 Apps Script /exec 網址。';
+        return;
+      }
+      pendingNonce = crypto.randomUUID();
+      bridgeWindow = null;
+      bridgeOrigin = null;
+      bridgeStatus.textContent = '等待 Apps Script 主動連線……';
+      testBridgeButton.disabled = true;
+      bankBridge.src = GAS_URL;
+    }
+
+    testBridgeButton.addEventListener('click', testBridge);
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (!isGoogleAppsScriptOrigin(event.origin)) return;
+      if (pendingNonce === null) return;
+
+      if (data.type === 'LOVE_BANK_READY') {
+        bridgeWindow = event.source;
+        bridgeOrigin = event.origin;
+        bridgeStatus.textContent = '收到 Apps Script READY，傳送 PING……';
+        bridgeWindow.postMessage({ type: 'LOVE_BANK_PING', nonce: pendingNonce }, bridgeOrigin);
+        return;
+      }
+
+      if (data.type === 'LOVE_BANK_PONG' &&
+          event.source === bridgeWindow &&
+          event.origin === bridgeOrigin &&
+          data.nonce === pendingNonce) {
+        bridgeStatus.textContent = '❤️ 雙向通訊成功！';
+        pendingNonce = null;
+        testBridgeButton.disabled = false;
+      }
+    });
+
+    bankBridge.addEventListener('load', () => {
+      if (pendingNonce !== null && bridgeStatus.textContent === '等待 Apps Script 主動連線……') {
+        bridgeStatus.textContent = 'iframe 已載入，等待 Apps Script READY……';
+      }
+      testBridgeButton.disabled = false;
+    });
+
+    initLine();
   </script>
-
-<!-- Apps Script 雙向通訊測試 -->
-<div style="text-align:center;padding:20px">
-  <h3>❤️ 戀愛點數銀行通訊測試</h3>
-
-  <p id="bridgeStatus">尚未開始測試</p>
-
-  <button type="button" onclick="testBridge()">
-    測試雙向通訊
-  </button>
-
-  <iframe
-    id="bankBridge"
-    title="Apps Script 通訊測試"
-    style="width:100%;height:100px;border:0">
-  </iframe>
-</div>
-
-<script>
-  const GAS_URL =
-    'https://script.google.com/macros/s/AKfycbx3Lx7duIrqO6Ml5ktrfjz8JKCxSsEAYplynyTU_NcSaHGa1E9HyoxzW7SXlfW0FNLWqg/exec';
-
-  let pendingNonce = null;
-
-  function testBridge() {
-    const status =
-      document.getElementById('bridgeStatus');
-
-    const frame =
-      document.getElementById('bankBridge');
-
-    pendingNonce = crypto.randomUUID();
-
-    status.textContent =
-      '正在載入 Apps Script……';
-
-    frame.onload = function() {
-      status.textContent =
-        'iframe 已載入，正在傳送 PING……';
-
-      frame.contentWindow.postMessage({
-        type: 'LOVE_BANK_PING',
-        nonce: pendingNonce
-      }, '*');
-    };
-
-    frame.src = GAS_URL;
-  }
-
-  window.addEventListener('message', function(event) {
-    const frame =
-      document.getElementById('bankBridge');
-
-    if (event.source !== frame.contentWindow) {
-      return;
-    }
-
-    const data = event.data;
-
-    if (
-      data &&
-      data.type === 'LOVE_BANK_PONG' &&
-      data.nonce === pendingNonce
-    ) {
-      document.getElementById('bridgeStatus')
-        .textContent = '❤️ 雙向通訊成功！';
-
-      pendingNonce = null;
-    }
-  });
-</script>
-
 </body>
 </html>
