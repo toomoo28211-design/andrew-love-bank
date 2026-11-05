@@ -228,6 +228,10 @@ testBackendButton.disabled = false;
   尚未進行 LINE 官方驗證
 </div>
 
+<button type="button" onclick="renewLineLogin()">
+  🔄 重新登入 LINE
+</button>
+
   <button type="button" onclick="checkLineToken()">
     檢查 LINE ID Token
   </button>
@@ -340,6 +344,38 @@ if (!response.ok || !result.success) {
     status.textContent = '❌ ' + error.message;
   } finally {
     button.disabled = false;
+  }
+}
+
+function renewLineLogin() {
+  const status =
+    document.getElementById('workerVerifyStatus');
+
+  try {
+    if (typeof liff === 'undefined') {
+      throw new Error('LINE LIFF 尚未載入');
+    }
+
+    if (liff.isInClient()) {
+      status.textContent =
+        '請關閉此頁，再從 LINE 重新開啟戀愛點數銀行';
+      return;
+    }
+
+    status.textContent = '正在重新啟動 LINE 登入……';
+
+    if (liff.isLoggedIn()) {
+      liff.logout();
+    }
+
+    liff.login({
+      redirectUri:
+        'https://toomoo28211-design.github.io/andrew-love-bank/'
+    });
+
+  } catch (error) {
+    status.textContent =
+      '❌ 重新登入失敗：' + error.message;
   }
 }
 
