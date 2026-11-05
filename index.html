@@ -57,6 +57,7 @@
 
     let myLineUserId = '';
     let pendingNonce = null;
+    let pendingSession = null;
     let bridgeWindow = null;
     let bridgeOrigin = null;
 
@@ -104,51 +105,79 @@
       }
     }
 
-    function testBridge() {
-      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(GAS_URL)) {
-        bridgeStatus.textContent = '請先設定正確的 Apps Script /exec 網址。';
-        return;
-      }
-      pendingNonce = crypto.randomUUID();
-      bridgeWindow = null;
-      bridgeOrigin = null;
-      bridgeStatus.textContent = '等待 Apps Script 主動連線……';
-      testBridgeButton.disabled = true;
-      bankBridge.src = GAS_URL;
-    }
+    
+function testBridge() {
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(GAS_URL)) {
+    bridgeStatus.textContent =
+      '請先設定正確的 Apps Script /exec 網址。';
+    return;
+  }
+
+  pendingNonce = crypto.randomUUID();
+  pendingSession = crypto.randomUUID();
+
+  bridgeWindow = null;
+  bridgeOrigin = null;
+
+  bridgeStatus.textContent =
+    '等待 Apps Script 主動連線……';
+
+  testBridgeButton.disabled = true;
+
+  const url = new URL(GAS_URL);
+  url.searchParams.set('session', pendingSession);
+
+  bankBridge.src = url.toString();
+}
+
 
     testBridgeButton.addEventListener('click', testBridge);
 
-    window.addEventListener('message', (event) => {
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-      if (!isGoogleAppsScriptOrigin(event.origin)) return;
-      if (pendingNonce === null) return;
+    
+window.addEventListener('message', (event) => {
+  const data = event.data;
 
-      if (data.type === 'LOVE_BANK_READY') {
-        bridgeWindow = event.source;
-        bridgeOrigin = event.origin;
-        bridgeStatus.textContent = '收到 Apps Script READY，傳送 PING……';
-        bridgeWindow.postMessage({ type: 'LOVE_BANK_PING', nonce: pendingNonce }, bridgeOrigin);
-        return;
-      }
+  if (!data || typeof data !== 'object') return;
+  if (!isGoogleAppsScriptOrigin(event.origin)) return;
 
-      if (data.type === 'LOVE_BANK_PONG' &&
-          event.source === bridgeWindow &&
-          event.origin === bridgeOrigin &&
-          data.nonce === pendingNonce) {
-        bridgeStatus.textContent = '❤️ 雙向通訊成功！';
-        pendingNonce = null;
-        testBridgeButton.disabled = false;
-      }
-    });
+  if (pendingNonce === null ||
+      pendingSession === null) return;
 
-    bankBridge.addEventListener('load', () => {
-      if (pendingNonce !== null && bridgeStatus.textContent === '等待 Apps Script 主動連線……') {
-        bridgeStatus.textContent = 'iframe 已載入，等待 Apps Script READY……';
-      }
-      testBridgeButton.disabled = false;
-    });
+  if (data.session !== pendingSession) return;
+
+  if (data.type === 'LOVE_BANK_READY') {
+    if (bridgeWindow !== null) return;
+
+    bridgeWindow = event.source;
+    bridgeOrigin = event.origin;
+
+    bridgeStatus.textContent =
+      '工作階段確認成功，傳送 PING……';
+
+    bridgeWindow.postMessage({
+      type: 'LOVE_BANK_PING',
+      session: pendingSession,
+      nonce: pendingNonce
+    }, bridgeOrigin);
+
+    return;
+  }
+
+  if (
+    data.type === 'LOVE_BANK_PONG' &&
+    event.source === bridgeWindow &&
+    event.origin === bridgeOrigin &&
+    data.nonce === pendingNonce
+  ) {
+    bridgeStatus.textContent =
+      '❤️ 安全握手完成，雙向通訊成功！';
+
+    pendingNonce = null;
+    pendingSession = null;
+
+    testBridgeButton.disabled = false;
+  }
+});
 
     initLine();
   </script>
