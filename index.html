@@ -152,5 +152,42 @@
 
     initLine();
   </script>
+
+<div style="text-align:center;padding:16px">
+  <h3>🔐 LINE 身分驗證準備檢查</h3>
+  <p id="tokenCheckStatus">尚未檢查</p>
+  <button type="button" onclick="checkLineToken()">
+    檢查 LINE ID Token
+  </button>
+</div>
+
+<script>
+function checkLineToken() {
+  const status = document.getElementById('tokenCheckStatus');
+
+  try {
+    if (typeof liff === 'undefined' || !liff.isLoggedIn()) {
+      status.textContent = '尚未完成 LINE 登入';
+      return;
+    }
+
+    const token = liff.getIDToken();
+
+    if (!token) {
+      status.textContent =
+        '尚未取得 ID Token，請確認 openid 權限';
+      return;
+    }
+
+    status.textContent =
+      '✅ LINE ID Token 已取得，可以進行後端驗證';
+
+  } catch (error) {
+    status.textContent =
+      '檢查失敗：' + error.message;
+  }
+}
+</script>
+
 </body>
 </html>
