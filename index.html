@@ -335,10 +335,18 @@ if (!response.ok || !result.success) {
   );
 }
 
-    status.textContent =
-      '✅ ' + result.message +
-      '\nLINE 顯示名稱：' + result.name +
-      '\n目前僅完成身分驗證，尚未授予銀行操作權限';
+    
+const roleText =
+  result.role === 'admin'
+    ? '👑 管理員（巧葳）'
+    : '⏳ 尚未取得銀行操作權限';
+
+status.textContent =
+  '✅ ' + result.message +
+  '\nLINE 顯示名稱：' + result.name +
+  '\n銀行身分：' + roleText +
+  '\n目前僅進行身分辨識，尚未開放點數操作';
+
 
   } catch (error) {
     status.textContent = '❌ ' + error.message;
