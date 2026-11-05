@@ -295,9 +295,19 @@ async function verifyLineWithWorker() {
 
     const result = await response.json();
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || 'LINE 身分驗證失敗');
-    }
+    
+if (!response.ok || !result.success) {
+  const diagnostic = result.diagnostic;
+
+  const detail = diagnostic
+    ? '（LINE HTTP ' + diagnostic.lineHttpStatus +
+      '，原因：' + diagnostic.reason + '）'
+    : '（Worker HTTP ' + response.status + '）';
+
+  throw new Error(
+    (result.message || 'LINE 身分驗證失敗') + detail
+  );
+}
 
     status.textContent =
       '✅ ' + result.message +
