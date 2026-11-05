@@ -282,6 +282,28 @@ async function verifyLineWithWorker() {
       throw new Error('未取得 LINE ID Token，請確認 openid 權限');
     }
 
+const decoded = liff.getDecodedIDToken();
+
+if (!decoded || !decoded.exp) {
+  throw new Error('無法讀取 LINE Token 有效期限');
+}
+
+const now = Math.floor(Date.now() / 1000);
+const remaining = decoded.exp - now;
+
+if (remaining <= 0) {
+  throw new Error(
+    'LINE ID Token 已過期 ' +
+    Math.abs(remaining) +
+    ' 秒，請重新登入 LINE'
+  );
+}
+
+status.textContent =
+  'Token 尚有 ' +
+  Math.floor(remaining / 60) +
+  ' 分鐘有效，正在向 LINE 官方驗證……';
+
     const response = await fetch(
       'https://andrew-love-bank-api.toomoo28211.workers.dev/api/verify',
       {
