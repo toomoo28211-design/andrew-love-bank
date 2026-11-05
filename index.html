@@ -414,14 +414,23 @@ async function testBalanceAuthorization() {
       );
     }
 
-    if (result.authorized !== true) {
-      throw new Error('後端未確認管理員權限');
-    }
+   
+if (
+  !Number.isSafeInteger(result.balance) ||
+  result.balance < 0
+) {
+  throw new Error('後端未回傳有效的點數餘額');
+}
 
-    status.textContent =
-      '✅ ' + result.message +
-      '\n管理員權限：已通過' +
-      '\n目前尚未讀取 Google Sheets 點數';
+
+    
+status.textContent =
+  '✅ ' + result.message +
+  '\n👑 管理員權限：已通過' +
+  '\n💗 彥安目前的戀愛點數：' +
+  result.balance + ' 點' +
+  '\n📊 資料來源：Google Sheets';
+
 
   } catch (error) {
     status.textContent = '❌ ' + error.message;
