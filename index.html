@@ -39,6 +39,11 @@
       <h2>Apps Script 雙向通訊</h2>
       <p class="status" id="bridgeStatus">尚未開始測試</p>
       <button id="testBridgeButton" type="button">測試雙向通訊</button>
+      
+<button id="testBackendButton" type="button" disabled>
+  測試 Apps Script 後端呼叫
+</button>
+
       <iframe id="bankBridge" title="Apps Script 通訊測試" referrerpolicy="no-referrer"></iframe>
       <small>僅傳送 READY、PING、PONG 與隨機測試碼；不傳送 LINE 身分憑證。</small>
     </section>
@@ -58,6 +63,7 @@
     let myLineUserId = '';
     let pendingNonce = null;
     let pendingSession = null;
+    let backendTestSession = null;
     let bridgeWindow = null;
     let bridgeOrigin = null;
 
@@ -116,6 +122,9 @@ function testBridge() {
   pendingNonce = crypto.randomUUID();
   pendingSession = crypto.randomUUID();
 
+backendTestSession = null;
+testBackendButton.disabled = true;
+
   bridgeWindow = null;
   bridgeOrigin = null;
 
@@ -132,6 +141,26 @@ function testBridge() {
 
 
     testBridgeButton.addEventListener('click', testBridge);
+
+const testBackendButton =
+  document.getElementById('testBackendButton');
+
+testBackendButton.addEventListener('click', function() {
+  if (!bridgeWindow || !bridgeOrigin || !backendTestSession) {
+    bridgeStatus.textContent =
+      '請先完成雙向通訊測試';
+    return;
+  }
+
+  testBackendButton.disabled = true;
+  bridgeStatus.textContent =
+    '正在測試 Apps Script 後端呼叫……';
+
+  bridgeWindow.postMessage({
+    type: 'LOVE_BANK_BACKEND_TEST',
+    session: backendTestSession
+  }, bridgeOrigin);
+});
 
     
 window.addEventListener('message', (event) => {
@@ -171,6 +200,9 @@ window.addEventListener('message', (event) => {
   ) {
     bridgeStatus.textContent =
       '❤️ 安全握手完成，雙向通訊成功！';
+
+backendTestSession = pendingSession;
+testBackendButton.disabled = false;
 
     pendingNonce = null;
     pendingSession = null;
