@@ -224,6 +224,19 @@ testBackendButton.disabled = false;
   🔐 驗證 LINE 身分
 </button>
 
+<button
+  id="balanceAuthButton"
+  type="button"
+  onclick="testBalanceAuthorization()"
+>
+  🔐 測試管理員餘額查詢權限
+</button>
+
+<pre
+  id="balanceAuthStatus"
+  style="white-space: pre-wrap;"
+></pre>
+
 <div id="workerVerifyStatus" role="status">
   尚未進行 LINE 官方驗證
 </div>
@@ -347,6 +360,68 @@ status.textContent =
   '\n銀行身分：' + roleText +
   '\n目前僅進行身分辨識，尚未開放點數操作';
 
+
+  } catch (error) {
+    status.textContent = '❌ ' + error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function testBalanceAuthorization() {
+  const button =
+    document.getElementById('balanceAuthButton');
+  const status =
+    document.getElementById('balanceAuthStatus');
+
+  if (button.disabled) return;
+
+  button.disabled = true;
+  status.textContent = '正在確認管理員權限……';
+
+  try {
+    if (typeof liff === 'undefined' || !liff.isLoggedIn()) {
+      throw new Error('請先完成 LINE 登入');
+    }
+
+    const idToken = liff.getIDToken();
+    const decoded = liff.getDecodedIDToken();
+
+    if (!idToken || !decoded || !decoded.exp) {
+      throw new Error('無法取得有效的 LINE 登入資訊');
+    }
+
+    if (decoded.exp <= Math.floor(Date.now() / 1000)) {
+      throw new Error('LINE 登入已過期，請重新登入');
+    }
+
+    const response = await fetch(
+      'https://andrew-love-bank-api.toomoo28211.workers.dev/api/balance',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ idToken })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || result.success !== true) {
+      throw new Error(
+        result.message || '管理員權限驗證失敗'
+      );
+    }
+
+    if (result.authorized !== true) {
+      throw new Error('後端未確認管理員權限');
+    }
+
+    status.textContent =
+      '✅ ' + result.message +
+      '\n管理員權限：已通過' +
+      '\n目前尚未讀取 Google Sheets 點數';
 
   } catch (error) {
     status.textContent = '❌ ' + error.message;
