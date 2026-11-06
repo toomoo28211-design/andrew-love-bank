@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#fff4f6">
-  <title>彥安的戀愛點數銀行｜連線測試</title>
+  <title>彥安的戀愛點數銀行</title>
   <style>
     :root { color-scheme: light; --pink:#c65b79; --dark:#4b3540; --muted:#776b72; }
     * { box-sizing:border-box; }
@@ -29,11 +29,11 @@
   <main>
     <section class="card">
       <h1>❤️ 彥安的戀愛點數銀行</h1>
-      <p class="subtitle">Andrew Love Bank · 安全連線測試版</p>
+      <p class="subtitle">Andrew Love Bank · 我們的甜蜜存摺</p>
       <h2>LINE 登入狀態</h2>
       <p class="status" id="loginStatus">準備連線 LINE……</p>
       <button class="secondary" id="copyIdButton" type="button" disabled>複製我的 LINE User ID</button>
-      <small>此測試頁不會新增、扣除或兌換點數。</small>
+      <small>此區僅顯示 LINE 登入狀態；正式發放需管理員另行確認。</small>
     </section>
     <section class="card">
       <h2>Apps Script 雙向通訊</h2>
@@ -473,6 +473,20 @@ function renewLineLogin() {
 
 </script>
 
+<!-- 會員與管理員共用：唯讀點數餘額 -->
+<section class="card" id="loveBalanceCard"
+  style="width:min(100% - 32px,480px);margin:18px auto;text-align:center;">
+  <h2>💗 彥安的戀愛點數存摺</h2>
+  <p style="color:#776b72;margin-bottom:6px;">目前可用戀愛點數</p>
+  <p style="font-size:44px;font-weight:700;color:#c65b79;margin:6px 0;">
+    <span id="loveBalanceValue">—</span><span style="font-size:18px;"> 點</span>
+  </p>
+  <p class="status" id="loveBalanceStatus">等待 LINE 登入後查詢……</p>
+  <button type="button" class="secondary" id="refreshLoveBalanceButton"
+    onclick="refreshLoveBalance()">🔄 重新整理點數餘額</button>
+  <small>此功能只查詢餘額，不會新增或扣除點數。</small>
+</section>
+
 <!-- 巧葳專用：發放戀愛點數 -->
 <section class="card" id="earnCard" hidden
   style="width:min(100% - 32px,480px);margin:18px auto;">
@@ -576,6 +590,58 @@ try {
 } catch (error) {
   // 儲存空間不可用時，禁止正式發放
   earnRequestNeedsReview = true;
+}
+
+// 唯讀餘額查詢：只呼叫 /api/balance，絕不呼叫 /api/earn
+let loveBalanceLoading = false;
+
+function displayLoveBalance(balance) {
+  if (!Number.isSafeInteger(balance) || balance < 0) {
+    throw new Error('後端未回傳有效的點數餘額');
+  }
+  document.getElementById('loveBalanceValue').textContent = String(balance);
+  document.getElementById('loveBalanceStatus').textContent =
+    '✅ 餘額已更新（資料來源：Google Sheets）';
+}
+
+async function refreshLoveBalance() {
+  const button = document.getElementById('refreshLoveBalanceButton');
+  const status = document.getElementById('loveBalanceStatus');
+  if (loveBalanceLoading) return;
+  loveBalanceLoading = true;
+  button.disabled = true;
+  status.textContent = '⏳ 正在安全查詢點數餘額……';
+
+  try {
+    if (typeof liff === 'undefined' || !liff.isLoggedIn()) {
+      throw new Error('請先完成 LINE 登入');
+    }
+    const idToken = liff.getIDToken();
+    const decoded = liff.getDecodedIDToken();
+    if (!idToken || !decoded || !decoded.exp ||
+        decoded.exp <= Math.floor(Date.now() / 1000)) {
+      throw new Error('LINE 登入已過期，請重新登入');
+    }
+
+    const response = await fetch(
+      'https://andrew-love-bank-api.toomoo28211.workers.dev/api/balance',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      }
+    );
+    const result = await response.json();
+    if (!response.ok || result.success !== true) {
+      throw new Error(result.message || '點數餘額查詢失敗');
+    }
+    displayLoveBalance(result.balance);
+  } catch (error) {
+    status.textContent = '❌ 無法更新餘額：' + error.message;
+  } finally {
+    loveBalanceLoading = false;
+    button.disabled = false;
+  }
 }
 
 async function showEarnCardForAdmin() {
@@ -730,6 +796,8 @@ status.textContent = '⏳ 正在安全發放點數……';
       '🏦 彥安目前餘額：' + result.balance + ' 點';
 
     
+displayLoveBalance(result.balance);
+
 reasonInput.value = '';
 
 // 只有收到後端確認成功，才解除待確認狀態
@@ -1091,6 +1159,7 @@ async function testLovePointsDryRun() {
 window.addEventListener('load', async function () {
   for (let i = 0; i < 20; i++) {
     if (typeof liff !== 'undefined' && liff.isLoggedIn()) {
+      await refreshLoveBalance();
       await showEarnCardForAdmin();
       return;
     }
