@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#fff4f6">
+  <meta name="theme-color" content="#fff1f3">
   <title>彥安的戀愛點數銀行</title>
   <style>
     :root { color-scheme: light; --pink:#c65b79; --dark:#4b3540; --muted:#776b72; }
@@ -22,20 +22,45 @@
     small { color:var(--muted); display:block; line-height:1.6; }
     iframe { display:block; width:100%; height:110px; border:1px solid #eee; border-radius:10px; margin-top:12px; background:white; }
     code { overflow-wrap:anywhere; }
+    /* Gift edition: presentation only; all bank APIs and transaction safeguards remain unchanged. */
+    body { background: radial-gradient(ellipse at 20% 0%,#ffe2e8 0%,transparent 44%),linear-gradient(160deg,#fff7f5,#fff0f4 65%,#fff9f4); }
+    main { margin:28px auto 0; }
+    .card { border:1px solid #fff7f8; box-shadow:0 12px 35px #ae63721a; }
+    .gift-hero { text-align:center; position:relative; overflow:hidden; padding:36px 24px 28px; background:linear-gradient(150deg,#fff,#fff8f8); }
+    .gift-hero:before { content:'♡'; position:absolute; right:-12px; top:-42px; font-size:160px; color:#f9e7ec; line-height:1; pointer-events:none; }
+    .gift-kicker { font-size:11px; letter-spacing:3px; font-weight:700; color:#ad7281; position:relative; }
+    .gift-hero h1 { position:relative; font-size:28px; line-height:1.5; margin:12px 0 8px; color:#75485b; }
+    .gift-hero .subtitle { position:relative; margin:0; font-size:13px; letter-spacing:1px; }
+    .gift-message { position:relative; color:#865e6b; font-size:14px; line-height:1.9; margin:20px 0 0; }
+    .gift-divider { width:60px; height:2px; margin:20px auto 0; background:linear-gradient(90deg,transparent,#d68ca1,transparent); }
+    #loveBalanceCard { margin-top:18px!important; padding:28px 24px!important; }
+    #loveBalanceCard h2 { color:#784c60; }
+    #loveBalanceCard #loveBalanceValue { font-size:54px; font-variant-numeric:tabular-nums; }
+    #loveBalanceCard .status { font-size:13px; }
+    #earnCard { border:1px solid #f3dce3; }
+    #earnCard h2 { color:#90556d; }
+    #earnCard input, #earnCard textarea { background:#fffafb; color:#4b3540; }
+    #earnCard button { transition:filter .2s; }
+    #earnCard button:active { filter:brightness(.95); }
+    .dev-only { display:none!important; }
+    .gift-footer { width:min(100% - 32px,480px); margin:8px auto 36px; text-align:center; color:#a17a87; font-size:12px; line-height:2; }
+    [hidden] { display:none!important; }
+    @media (max-width:380px) { .gift-hero h1 { font-size:24px; } .card { padding:20px; } }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <main>
-    <section class="card">
-      <h1>❤️ 彥安的戀愛點數銀行</h1>
-      <p class="subtitle">Andrew Love Bank · 我們的甜蜜存摺</p>
-      <h2>LINE 登入狀態</h2>
-      <p class="status" id="loginStatus">準備連線 LINE……</p>
-      <button class="secondary" id="copyIdButton" type="button" disabled>複製我的 LINE User ID</button>
-      <small>此區僅顯示 LINE 登入狀態；正式發放需管理員另行確認。</small>
+    <section class="card gift-hero">
+      <div class="gift-kicker">A LITTLE LOVE, EVERY DAY</div>
+      <h1>♡ 彥安的戀愛點數銀行</h1>
+      <p class="subtitle">ANDREW LOVE BANK</p>
+      <div class="gift-divider"></div>
+      <p class="gift-message">給最特別的你：<br>把每一份貼心，都存成值得珍藏的回憶。<br>這是只屬於我們的小小銀行 ♡</p>
+      <p class="status" id="loginStatus" style="margin-top:22px;font-size:13px;">準備連線 LINE……</p>
+      <button class="secondary dev-only" id="copyIdButton" type="button" disabled>複製我的 LINE User ID</button>
     </section>
-    <section class="card">
+    <section class="card dev-only">
       <h2>Apps Script 雙向通訊</h2>
       <p class="status" id="bridgeStatus">尚未開始測試</p>
       <button id="testBridgeButton" type="button">測試雙向通訊</button>
@@ -214,7 +239,7 @@ testBackendButton.disabled = false;
     initLine();
   </script>
 
-<div style="text-align:center;padding:16px">
+<div class="dev-only" style="text-align:center;padding:16px">
   <h3>🔐 LINE 身分驗證準備檢查</h3>
   <p id="tokenCheckStatus">尚未檢查</p>
   
@@ -510,20 +535,6 @@ function renewLineLogin() {
     margin:8px 0 16px;border:1px solid #e5cbd3;
     border-radius:12px;font:inherit;"></textarea>
 
-<!-- 不入帳測試按鈕 -->
-<button
-  type="button"
-  id="dryRunButton"
-  onclick="testLovePointsDryRun()"
->
-  🧪 不入帳測試（不增加點數）
-</button>
-
-<div
-  id="dryRunStatus"
-  style="white-space: pre-line; margin-top: 12px;"
-></div>
-
 <!-- 正式發放點數按鈕 -->
 <button
   type="button"
@@ -560,6 +571,23 @@ function renewLineLogin() {
   ></p>
 </div>
 
+<details style="margin-top:20px;border-top:1px solid #f4e1e7;padding-top:14px;">
+<summary style="cursor:pointer;color:#987584;font-size:13px;">🔐 管理員進階安全測試</summary>
+<div style="padding-top:12px;">
+<!-- 不入帳測試按鈕 -->
+<button
+  type="button"
+  id="dryRunButton"
+  onclick="testLovePointsDryRun()"
+>
+  🧪 不入帳測試（不增加點數）
+</button>
+
+<div
+  id="dryRunStatus"
+  style="white-space: pre-line; margin-top: 12px;"
+></div>
+
 <button
   type="button"
   id="testTransactionStatusButton"
@@ -574,6 +602,8 @@ function renewLineLogin() {
   style="white-space:pre-line;"
 ></p>
 
+</div>
+</details>
 </section>
 
 <script>
@@ -1168,5 +1198,6 @@ window.addEventListener('load', async function () {
 });
 </script>
 
+<div class="gift-footer">Made with love ♡<br>每一點心意，都值得被珍惜。</div>
 </body>
 </html>
