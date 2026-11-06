@@ -979,12 +979,14 @@ function restorePendingEarnNotice() {
 
   if (button) button.disabled = true;
 
-  if (status) {
-    status.textContent =
-      '⚠️ 偵測到尚未確認的正式發放交易。\n' +
-      '為避免重複入帳，已暫停發放功能。\n' +
-      '請使用下方按鈕查詢交易狀態。';
-  }
+  
+if (status && !status.textContent.includes('⚠️')) {
+  status.textContent =
+    '⚠️ 偵測到尚未確認的正式發放交易。\n' +
+    '為避免重複入帳，已暫停發放功能。\n' +
+    '請使用下方按鈕查詢交易狀態。';
+}
+
 }
   
 restorePendingEarnNotice();
