@@ -67,6 +67,7 @@
       <div class="gift-divider"></div>
       <p class="gift-message">給最特別的你：<br>把每一份貼心，都存成值得珍藏的回憶。<br>這是只屬於我們的小小銀行 ♡</p>
       <p class="status" id="loginStatus" style="margin-top:22px;font-size:13px;">準備連線 LINE……</p>
+      <button class="secondary" id="reloginButton" type="button" onclick="restartLoveBankLogin()" hidden>🔐 重新登入 LINE</button>
       <button class="secondary dev-only" id="copyIdButton" type="button" disabled>複製我的 LINE User ID</button>
     </section>
     <section class="card dev-only">
@@ -101,6 +102,31 @@
     let bridgeWindow = null;
     let bridgeOrigin = null;
 
+    function showReloginButton(message) {
+      const button = document.getElementById('reloginButton');
+      if (button) button.hidden = false;
+      if (message) loginStatus.textContent = message;
+    }
+
+    function restartLoveBankLogin() {
+      const button = document.getElementById('reloginButton');
+      if (button) button.disabled = true;
+      try {
+        if (typeof liff === 'undefined') throw new Error('LINE LIFF 尚未載入');
+        if (liff.isInClient()) {
+          loginStatus.textContent = '請先關閉此頁，再從 LINE 聊天室重新開啟銀行。';
+          if (button) button.disabled = false;
+          return;
+        }
+        loginStatus.textContent = '正在重新啟動 LINE 登入……';
+        if (liff.isLoggedIn()) liff.logout();
+        liff.login({ redirectUri: 'https://toomoo28211-design.github.io/andrew-love-bank/' });
+      } catch (error) {
+        loginStatus.textContent = '重新登入失敗：' + (error.message || String(error));
+        if (button) button.disabled = false;
+      }
+    }
+
     async function initLine() {
       if (!LIFF_ID || LIFF_ID.startsWith('請貼上')) {
         loginStatus.textContent = '請先在 index.html 設定 LIFF_ID。';
@@ -113,12 +139,20 @@
           liff.login({ redirectUri: window.location.href });
           return;
         }
+        const idToken = liff.getIDToken();
+        const decoded = liff.getDecodedIDToken();
+        if (!idToken || !decoded || !decoded.exp ||
+            decoded.exp <= Math.floor(Date.now() / 1000)) {
+          showReloginButton('LINE 登入憑證已過期，請點選下方按鈕重新登入。');
+          return;
+        }
         const profile = await liff.getProfile();
         myLineUserId = profile.userId || '';
         loginStatus.textContent = '❤️ LINE 登入成功！你好，' + (profile.displayName || '親愛的') + '！';
         copyIdButton.disabled = !myLineUserId;
+        document.getElementById('reloginButton').hidden = true;
       } catch (error) {
-        loginStatus.textContent = 'LINE 登入失敗：' + (error.message || String(error));
+        showReloginButton('LINE 登入失敗：' + (error.message || String(error)));
       }
     }
 
@@ -426,7 +460,8 @@ async function testBalanceAuthorization() {
     }
 
     if (decoded.exp <= Math.floor(Date.now() / 1000)) {
-      throw new Error('LINE 登入已過期，請重新登入');
+      showReloginButton('LINE 登入憑證已過期，請點選「重新登入 LINE」。');
+      throw new Error('LINE 登入已過期，請點選上方「重新登入 LINE」');
     }
 
     const response = await fetch(
@@ -1228,7 +1263,8 @@ async function refreshLoveRewards() {
     const decoded = liff.getDecodedIDToken();
     if (!idToken || !decoded || !decoded.exp ||
         decoded.exp <= Math.floor(Date.now() / 1000)) {
-      throw new Error('LINE 登入已過期，請從 LINE 重新開啟銀行');
+      showReloginButton('LINE 登入憑證已過期，請點選「重新登入 LINE」。');
+      throw new Error('LINE 登入已過期，請點選上方「重新登入 LINE」');
     }
 
     const response = await fetch(
