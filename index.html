@@ -750,11 +750,16 @@ earnRequestNeedsReview = false;
     '\n請先查看 Google Sheets「點數紀錄」，' +
     '確認是否已入帳，避免重複發放。';
 
+  
   } finally {
     earnRequestInProgress = false;
     button.disabled = earnRequestNeedsReview;
+
+    // 更新待確認交易提示與查詢面板
+    restorePendingEarnNotice();
   }
 }
+
 
 async function checkPendingLoveTransaction() {
   const panel = document.getElementById('pendingEarnPanel');
