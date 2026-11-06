@@ -564,12 +564,22 @@ function renewLineLogin() {
   <p class="reward-intro">每一份貼心，都能換成我們的小小幸福 ♡</p>
   <p class="status" id="rewardStatus" role="status">等待 LINE 登入後讀取獎勵……</p>
   <div id="rewardGrid" class="reward-grid" hidden></div>
+  <p class="status" id="redeemMessage" role="status">選擇獎勵券後可提出申請（目前 0 點時無法申請）。</p>
+  <button type="button" class="secondary" onclick="refreshRedeemRequests()">📜 我的兌換申請</button>
+  <div id="redeemRequestList"></div>
   <button type="button" class="secondary" id="refreshRewardsButton"
     onclick="refreshLoveRewards()">🔄 重新整理獎勵清單</button>
   <small>目前僅開放查看獎勵券，尚未開放申請兌換，也不會扣除點數。</small>
 </section>
 
 <!-- 巧葳專用：發放戀愛點數 -->
+<section class="card" id="redeemAdminCard" hidden>
+  <h2>💌 巧葳的兌換審核</h2>
+  <button type="button" class="secondary" onclick="refreshRedeemRequests()">🔄 重新整理待審核申請</button>
+  <p class="status" id="redeemAdminMessage">只有管理員能核准或拒絕</p>
+  <div id="redeemAdminList"></div>
+</section>
+
 <section class="card" id="earnCard" hidden
   style="width:min(100% - 32px,480px);margin:18px auto;">
 
@@ -1308,7 +1318,12 @@ async function refreshLoveRewards() {
       const cost = document.createElement('div');
       cost.className = 'reward-cost';
       cost.textContent = reward.cost + ' 點';
-      item.append(symbol, name, cost);
+      const apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'secondary';
+      apply.textContent = '💌 申請兌換';
+      apply.onclick = () => submitRedeemRequest(reward.id, reward.name, Number(reward.cost));
+      item.append(symbol, name, cost, apply);
       fragment.appendChild(item);
     }
     grid.replaceChildren(fragment);
@@ -1327,6 +1342,96 @@ async function refreshLoveRewards() {
   }
 }
 
+
+// === 兌換申請：未知結果保留 UUID，先查詢狀態，不自動重送 ===
+const REDEEM_API = 'https://andrew-love-bank-api.toomoo28211.workers.dev';
+let redeemBusy = false;
+let redeemIsAdmin = false;
+function redeemToken() {
+  if (typeof liff === 'undefined' || !liff.isLoggedIn()) throw new Error('請先登入 LINE');
+  const token=liff.getIDToken(), decoded=liff.getDecodedIDToken();
+  if (!token || !decoded || !decoded.exp || decoded.exp <= Date.now()/1000) throw new Error('LINE 登入已過期，請重新登入');
+  return token;
+}
+async function redeemPost(path, payload) {
+  const response=await fetch(REDEEM_API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:redeemToken(),...payload})});
+  const result=await response.json();
+  if (!response.ok || result.success !== true) { const err=new Error(result.message || '操作失敗'); err.definitive = response.status === 400 || response.status === 401 || response.status === 403; throw err; }
+  return result;
+}
+async function submitRedeemRequest(rewardId, rewardName, cost) {
+  const status=document.getElementById('redeemMessage');
+  if (redeemBusy) return;
+  if (!confirm('確認申請「'+rewardName+'」('+cost+' 點)？送出後等待巧葳核准才會扣點。')) return;
+  const pendingKey='love_bank_pending_redeem_v1';
+  const previous=localStorage.getItem(pendingKey);
+  if (previous) {status.textContent='⚠️ 有一筆尚未確認結果的申請，請先查詢狀態，勿重複送出。';await refreshRedeemRequests();return;}
+  const requestId=crypto.randomUUID();
+  redeemBusy=true;
+  localStorage.setItem(pendingKey,JSON.stringify({requestId,rewardId}));
+  status.textContent='⏳ 正在送出申請……';
+  try {
+    const result=await redeemPost('/api/redeem-request',{requestId,rewardId});
+    status.textContent='💗 '+result.message;
+    localStorage.removeItem(pendingKey);
+    await refreshRedeemRequests();
+  } catch(e) {
+    if (e.definitive) localStorage.removeItem(pendingKey);
+    status.textContent=e.definitive ? '❌ 申請未成立：'+e.message : '⚠️ '+e.message+'。申請結果尚未確認，請點「我的兌換申請」查詢。';
+  } finally {redeemBusy=false;}
+}
+async function refreshRedeemRequests() {
+  const status=document.getElementById('redeemMessage');
+  const list=document.getElementById('redeemRequestList');
+  const adminList=document.getElementById('redeemAdminList');
+  try {
+    const result=await redeemPost('/api/redeem-status',{requestId:''});
+    list.replaceChildren();adminList.replaceChildren();
+    for (const item of result.requests || []) {
+      const p=document.createElement('p');
+      p.textContent='💌 '+item.rewardName+'・'+item.cost+' 點・'+item.status;
+      list.appendChild(p);
+      if (redeemIsAdmin && item.status === '待審核') {
+        const row=document.createElement('div');row.className='reward-item';
+        const title=document.createElement('p');title.textContent=item.rewardName+'（'+item.cost+' 點）';
+        const yes=document.createElement('button');yes.type='button';yes.textContent='💗 核准扣點';
+        yes.onclick=()=>reviewRedeem(item.requestId,'approve');
+        const no=document.createElement('button');no.type='button';no.className='secondary';no.textContent='拒絕申請';
+        no.onclick=()=>reviewRedeem(item.requestId,'reject');
+        row.append(title,yes,no);adminList.appendChild(row);
+      }
+    }
+    if (!result.requests?.length) list.textContent='目前尚無兌換申請。';
+    if (redeemIsAdmin && !adminList.children.length) adminList.textContent='目前沒有待審核申請。';
+    const raw=localStorage.getItem('love_bank_pending_redeem_v1');
+    if (raw) {
+      const pending=JSON.parse(raw);
+      const found=(result.requests || []).find(x=>x.requestId===pending.requestId);
+      if (found) {localStorage.removeItem('love_bank_pending_redeem_v1');status.textContent='💗 已確認申請：'+found.rewardName+'（'+found.status+'）';}
+      else status.textContent='⚠️ 申請編號 '+pending.requestId+' 尚未查到紀錄。請稍後再查，勿直接重送。';
+    }
+  } catch(e) {status.textContent='❌ 申請查詢失敗：'+e.message;}
+}
+async function reviewRedeem(requestId, decision) {
+  const label=decision==='approve'?'核准並扣除點數':'拒絕';
+  if (!confirm('確定要'+label+'這筆申請嗎？')) return;
+  const status=document.getElementById('redeemAdminMessage');
+  status.textContent='⏳ 審核處理中……';
+  try {
+    const result=await redeemPost('/api/redeem-review',{requestId,decision,note:''});
+    status.textContent='💗 '+result.message;
+    await refreshRedeemRequests();await refreshLoveBalance();
+  } catch(e) {status.textContent='⚠️ '+e.message+'。請先重新整理申請狀態，勿重複按核准。';}
+}
+async function initRedeemAdmin() {
+  try {
+    const result=await redeemPost('/api/verify',{});
+    redeemIsAdmin=result.role==='admin';
+    document.getElementById('redeemAdminCard').hidden=!redeemIsAdmin;
+    await refreshRedeemRequests();
+  } catch(e) {document.getElementById('redeemMessage').textContent='兌換功能尚未就緒：'+e.message;}
+}
+
 // 等待原本的 LINE 初始化完成，再驗證管理員
 window.addEventListener('load', async function () {
   for (let i = 0; i < 20; i++) {
@@ -1334,6 +1439,7 @@ window.addEventListener('load', async function () {
       await refreshLoveBalance();
       await refreshLoveRewards();
       await showEarnCardForAdmin();
+      await initRedeemAdmin();
       return;
     }
     await new Promise(resolve => setTimeout(resolve, 500));
