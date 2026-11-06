@@ -684,20 +684,6 @@ localStorage.setItem(
   })
 );
 
-
-const transactionId = crypto.randomUUID();
-
-// 送出前先保存待確認交易
-sessionStorage.setItem(
-  LOVE_BANK_PENDING_KEY,
-  JSON.stringify({
-    transactionId,
-    amount,
-    reason,
-    createdAt: Date.now()
-  })
-);
-
 earnRequestInProgress = true;
 button.disabled = true;
 status.textContent = '⏳ 正在安全發放點數……';
@@ -995,10 +981,7 @@ function restorePendingEarnNotice() {
       '請使用下方按鈕查詢交易狀態。';
   }
 }
-
-restorePendingEarnNotice();
-
-
+  
 restorePendingEarnNotice();
 
 async function testLovePointsDryRun() {
@@ -1084,24 +1067,17 @@ async function testLovePointsDryRun() {
       '📋 請再確認 Google Sheets 沒有新增交易紀錄。';
 
   
+
 } catch (error) {
-  if (earnRequestInProgress) {
-    earnRequestNeedsReview = true;
-  }
-
   status.textContent =
-    '⚠️ ' + error.message +
-    '\n請先查看 Google Sheets「點數紀錄」，' +
-    '確認是否已入帳，避免重複發放。';
+    '❌ 不入帳測試未通過\n' +
+    '原因：' + error.message + '\n' +
+    '請檢查 Google Sheets 點數紀錄。';
 
-      '❌ 不入帳測試未通過\n' +
-      '原因：' + error.message + '\n' +
-      '請檢查 Google Sheets 點數紀錄，' +
-      '暫時不要重複測試。';
+} finally {
+  button.disabled = false;
+}
 
-  } finally {
-    button.disabled = false;
-  }
 }
 
 // 等待原本的 LINE 初始化完成，再驗證管理員
