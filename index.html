@@ -498,6 +498,8 @@ function renewLineLogin() {
 
   <button type="button" id="earnButton"
     
+
+<!-- 不入帳測試按鈕 -->
 <button
   type="button"
   id="dryRunButton"
@@ -511,9 +513,15 @@ function renewLineLogin() {
   style="white-space: pre-line; margin-top: 12px;"
 ></div>
 
-    onclick="submitLovePoints()">
-    💗 確認發放戀愛點數
-  </button>
+<!-- 正式發放點數按鈕 -->
+<button
+  type="button"
+  id="earnButton"
+  onclick="submitLovePoints()"
+>
+  💗 確認發放戀愛點數
+</button>
+
 
   <p class="status" id="earnStatus">
     請填寫點數及發放原因。
