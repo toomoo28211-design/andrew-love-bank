@@ -497,6 +497,20 @@ function renewLineLogin() {
     border-radius:12px;font:inherit;"></textarea>
 
   <button type="button" id="earnButton"
+    
+<button
+  type="button"
+  id="dryRunButton"
+  onclick="testLovePointsDryRun()"
+>
+  🧪 不入帳測試（不增加點數）
+</button>
+
+<div
+  id="dryRunStatus"
+  style="white-space: pre-line; margin-top: 12px;"
+></div>
+
     onclick="submitLovePoints()">
     💗 確認發放戀愛點數
   </button>
@@ -659,6 +673,100 @@ async function submitLovePoints() {
   } finally {
     earnRequestInProgress = false;
     button.disabled = earnRequestNeedsReview;
+  }
+}
+
+async function testLovePointsDryRun() {
+  const button = document.getElementById('dryRunButton');
+  const status = document.getElementById('dryRunStatus');
+
+  if (earnRequestInProgress || earnRequestNeedsReview) {
+    status.textContent =
+      '⚠️ 目前有待確認的正式交易，請先檢查交易紀錄。';
+    return;
+  }
+
+  if (button.disabled) return;
+
+  try {
+    if (typeof liff === 'undefined' || !liff.isLoggedIn()) {
+      throw new Error('請先登入 LINE');
+    }
+
+    const idToken = liff.getIDToken();
+    const decoded = liff.getDecodedIDToken();
+
+    if (
+      !idToken ||
+      !decoded ||
+      decoded.exp <= Math.floor(Date.now() / 1000)
+    ) {
+      throw new Error('LINE 登入已過期，請重新登入');
+    }
+
+    const confirmed = window.confirm(
+      '🧪 戀愛點數銀行不入帳測試\n\n' +
+      '測試點數：1 點\n' +
+      '測試原因：系統發放功能驗證\n\n' +
+      '此操作將要求後端執行 earn_dry_run，' +
+      '不應新增任何點數紀錄。\n\n' +
+      '確定開始測試？'
+    );
+
+    if (!confirmed) return;
+
+    button.disabled = true;
+    status.textContent = '⏳ 正在執行不入帳測試……';
+
+    const transactionId = crypto.randomUUID();
+
+    const response = await fetch(
+      'https://andrew-love-bank-api.toomoo28211.workers.dev/api/earn',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          idToken,
+          transactionId,
+          amount: 1,
+          reason: '系統發放功能驗證',
+          dryRun: true
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (
+      !response.ok ||
+      result.success !== true ||
+      result.dryRun !== true ||
+      !Number.isSafeInteger(result.balance) ||
+      result.balance < 0
+    ) {
+      throw new Error(
+        result.message || '不入帳測試未通過'
+      );
+    }
+
+    status.textContent =
+      '✅ 不入帳測試通過！\n' +
+      '🔐 LINE 管理員及 HMAC 驗證完成\n' +
+      '🧪 後端確認 dryRun：true\n' +
+      '💗 目前餘額：' + result.balance + ' 點\n' +
+      '📋 請再確認 Google Sheets 沒有新增交易紀錄。';
+
+  } catch (error) {
+    status.textContent =
+      '❌ 不入帳測試未通過\n' +
+      '原因：' + error.message + '\n' +
+      '請檢查 Google Sheets 點數紀錄，' +
+      '暫時不要重複測試。';
+
+  } finally {
+    button.disabled = false;
   }
 }
 
