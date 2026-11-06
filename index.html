@@ -44,6 +44,15 @@
     #earnCard button:active { filter:brightness(.95); }
     .dev-only { display:none!important; }
     .gift-footer { width:min(100% - 32px,480px); margin:8px auto 36px; text-align:center; color:#a17a87; font-size:12px; line-height:2; }
+
+    /* Rewards gallery: read-only, separate from transaction logic. */
+    .reward-intro { color:#886a76; font-size:13px; margin:0 0 16px; }
+    .reward-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+    .reward-item { background:linear-gradient(145deg,#fff9fa,#fff1f4); border:1px solid #f1dce3; border-radius:16px; padding:16px 12px; text-align:center; min-width:0; }
+    .reward-icon { font-size:27px; line-height:1.5; }
+    .reward-name { font-weight:700; color:#75485b; margin:7px 0 9px; overflow-wrap:anywhere; }
+    .reward-cost { display:inline-block; padding:5px 10px; border-radius:999px; background:white; color:#b45273; font-weight:700; font-size:13px; }
+    #rewardCard h2 { color:#90556d; }
     [hidden] { display:none!important; }
     @media (max-width:380px) { .gift-hero h1 { font-size:24px; } .card { padding:20px; } }
   </style>
@@ -510,6 +519,19 @@ function renewLineLogin() {
   <button type="button" class="secondary" id="refreshLoveBalanceButton"
     onclick="refreshLoveBalance()">🔄 重新整理點數餘額</button>
   <small>此功能只查詢餘額，不會新增或扣除點數。</small>
+</section>
+
+
+<!-- 戀愛獎勵商店：僅顯示獎勵，不申請、不扣點 -->
+<section class="card" id="rewardCard"
+  style="width:min(100% - 32px,480px);margin:18px auto;">
+  <h2>🎁 彥安的戀愛獎勵商店</h2>
+  <p class="reward-intro">每一份貼心，都能換成我們的小小幸福 ♡</p>
+  <p class="status" id="rewardStatus" role="status">等待 LINE 登入後讀取獎勵……</p>
+  <div id="rewardGrid" class="reward-grid" hidden></div>
+  <button type="button" class="secondary" id="refreshRewardsButton"
+    onclick="refreshLoveRewards()">🔄 重新整理獎勵清單</button>
+  <small>目前僅開放查看獎勵券，尚未開放申請兌換，也不會扣除點數。</small>
 </section>
 
 <!-- 巧葳專用：發放戀愛點數 -->
@@ -1185,11 +1207,96 @@ async function testLovePointsDryRun() {
 
 }
 
+
+// 獎勵商店唯讀查詢：只呼叫 /api/rewards，不會呼叫發點或扣點 API。
+let loveRewardsLoading = false;
+
+async function refreshLoveRewards() {
+  const button = document.getElementById('refreshRewardsButton');
+  const status = document.getElementById('rewardStatus');
+  const grid = document.getElementById('rewardGrid');
+  if (loveRewardsLoading) return;
+  loveRewardsLoading = true;
+  button.disabled = true;
+  status.textContent = '⏳ 正在讀取戀愛獎勵券……';
+
+  try {
+    if (typeof liff === 'undefined' || !liff.isLoggedIn()) {
+      throw new Error('請先完成 LINE 登入');
+    }
+    const idToken = liff.getIDToken();
+    const decoded = liff.getDecodedIDToken();
+    if (!idToken || !decoded || !decoded.exp ||
+        decoded.exp <= Math.floor(Date.now() / 1000)) {
+      throw new Error('LINE 登入已過期，請從 LINE 重新開啟銀行');
+    }
+
+    const response = await fetch(
+      'https://andrew-love-bank-api.toomoo28211.workers.dev/api/rewards',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      }
+    );
+    const result = await response.json();
+    if (!response.ok || result.success !== true) {
+      throw new Error(result.message || '獎勵清單讀取失敗');
+    }
+
+    // 相容後端直接回傳 rewards 或包在 data 中的格式。
+    const rewards = Array.isArray(result.rewards)
+      ? result.rewards
+      : (result.data && Array.isArray(result.data.rewards)
+          ? result.data.rewards : null);
+    if (!rewards) throw new Error('後端回傳的獎勵清單格式不正確');
+
+    const icons = ['💌', '🫧', '🌞', '👔', '🏃', '💆', '🧹', '🍽️'];
+    const fragment = document.createDocumentFragment();
+    for (const reward of rewards) {
+      if (!reward || typeof reward.id !== 'string' ||
+          typeof reward.name !== 'string' || !reward.name.trim() ||
+          !Number.isSafeInteger(Number(reward.cost)) || Number(reward.cost) <= 0) {
+        throw new Error('獎勵資料格式不正確');
+      }
+      const item = document.createElement('article');
+      item.className = 'reward-item';
+      const symbol = document.createElement('div');
+      symbol.className = 'reward-icon';
+      const index = Number(reward.id.replace(/^R/i, ''));
+      symbol.textContent = Number.isInteger(index) && index >= 1 && index <= 8
+        ? icons[index - 1] : '🎁';
+      const name = document.createElement('div');
+      name.className = 'reward-name';
+      name.textContent = reward.name;
+      const cost = document.createElement('div');
+      cost.className = 'reward-cost';
+      cost.textContent = reward.cost + ' 點';
+      item.append(symbol, name, cost);
+      fragment.appendChild(item);
+    }
+    grid.replaceChildren(fragment);
+    grid.hidden = rewards.length === 0;
+    status.textContent = rewards.length
+      ? '💗 已更新 ' + rewards.length + ' 張戀愛獎勵券'
+      : '目前沒有開放兌換的獎勵券。';
+  } catch (error) {
+    // 讀取失敗時清空舊清單，避免誤以為是最新資料。
+    grid.replaceChildren();
+    grid.hidden = true;
+    status.textContent = '❌ 無法讀取獎勵券：' + error.message;
+  } finally {
+    loveRewardsLoading = false;
+    button.disabled = false;
+  }
+}
+
 // 等待原本的 LINE 初始化完成，再驗證管理員
 window.addEventListener('load', async function () {
   for (let i = 0; i < 20; i++) {
     if (typeof liff !== 'undefined' && liff.isLoggedIn()) {
       await refreshLoveBalance();
+      await refreshLoveRewards();
       await showEarnCardForAdmin();
       return;
     }
